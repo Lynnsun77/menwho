@@ -338,6 +338,9 @@
      position:sticky;top:0;z-index:1}
   tbody tr{transition:background var(--t-fast)}
   tr:hover td{background:var(--bg2)}
+  tr.clickable-row{cursor:pointer}
+  tr.clickable-row:hover td{background:var(--p-light)}
+  tr.clickable-row:hover td:first-child{box-shadow:inset 3px 0 0 var(--p)}
   .level{display:inline-block;padding:2px 8px;border-radius:var(--r-sm);font-size:11px;font-weight:500;
          transition:transform var(--t-fast)}
   .level:hover{transform:translateY(-1px)}
@@ -505,6 +508,26 @@
   .quality-bar .progress{flex:1;margin:0}
   .quality-bar .num{font-family:"SF Mono",Menlo,Consolas,monospace;font-size:12px;color:var(--text);min-width:48px;text-align:right}
 
+  /* ========= CHIP · 用于状态筛选 ========= */
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:16px;
+        background:#fff;border:1px solid var(--line);color:var(--text2);font-size:11px;
+        cursor:pointer;transition:all var(--t-fast);line-height:1}
+  .chip:hover{border-color:var(--p);color:var(--p);background:var(--p-light)}
+  .chip b{color:var(--text);font-weight:600}
+  .chip-active{background:var(--p);color:#fff;border-color:var(--p)}
+  .chip-active b{color:#fff}
+  .chip-active:hover{background:var(--p);color:#fff}
+
+  /* ========= PAGINATION ========= */
+  .pg-btn{min-width:30px;height:28px;padding:0 10px;border:1px solid var(--line);
+          background:#fff;color:var(--text2);border-radius:6px;font-size:12px;
+          cursor:pointer;transition:all var(--t-fast);display:inline-flex;align-items:center;justify-content:center}
+  .pg-btn:hover:not(:disabled){border-color:var(--p);color:var(--p);background:var(--p-light)}
+  .pg-btn.active{background:var(--p);color:#fff;border-color:var(--p);font-weight:600}
+  .pg-btn:disabled{opacity:.35;cursor:not-allowed}
+  .pg-ell{color:var(--mute);padding:0 2px;font-size:11px}
+  .pg-wrap{flex-wrap:wrap;justify-content:flex-end}
+
   /* ========= 响应式 ========= */
   @media (max-width:1280px){
     .kpi-row{grid-template-columns:repeat(3,1fr)}
@@ -527,6 +550,10 @@
     .modal{width:96vw;max-height:96vh}
     .modal-body{padding:14px}
     .breadcrumb{display:none}
+    .consumers-table-wrap{overflow-x:auto;margin:10px 12px !important}
+    .consumers-table-wrap table{min-width:640px}
+    .modal-foot{flex-direction:column;gap:8px;align-items:stretch}
+    .pg-wrap{justify-content:center}
   }
 
   /* 减少动画偏好 */
@@ -606,6 +633,11 @@
 <!-- ============== 通用表单 MODAL（申请 / 审批 / 续期） ============== -->
 <div class="modal-mask" id="formModal" onclick="if(event.target===this)closeFormModal()">
   <div class="modal" id="formModalInner"></div>
+</div>
+
+<!-- ============== 使用方明细 MODAL（Owner 资产 → 消费方明细） ============== -->
+<div class="modal-mask" id="tagConsumersModal" onclick="if(event.target===this)closeTagConsumersModal()">
+  <div class="modal" id="tagConsumersInner"></div>
 </div>
 
 <script>
@@ -796,17 +828,42 @@ let OWNER_USAGE_SUMMARY = {
   approvalStats: {applied:428, approved:355, rejected:41, pending:32},
   abnormalCount: 7,
   topTags: [
-    {name:"活跃天数分层",         calls:"2.4 亿/日", teams:22, trend:"+18%"},
-    {name:"标准四级类目购买人群", calls:"6300 万/日", teams:18, trend:"+9%"},
-    {name:"支付交易单数",         calls:"4100 万/日", teams:11, trend:"+4%"},
-    {name:"支付交易金额",         calls:"2800 万/日", teams:9,  trend:"—"},
-    {name:"常驻 POI",             calls:"820 万/日",  teams:5,  trend:"-3%"}
+    {name:"活跃天数分层",         calls:"2.4 亿/日", teams:22, trend:"+18%", scenes:"推荐排序 · 营销触达 · 召回",  topConsumer:"电商增长团队"},
+    {name:"标准四级类目购买人群", calls:"6300 万/日",teams:18, trend:"+9%",  scenes:"品类推荐 · 精准营销",         topConsumer:"直播电商"},
+    {name:"支付交易单数",         calls:"4100 万/日",teams:11, trend:"+4%",  scenes:"高价值分析 · 复购模型",       topConsumer:"电商增长团队"},
+    {name:"支付交易金额",         calls:"2800 万/日",teams:9,  trend:"—",    scenes:"用户分层 · 权益运营",         topConsumer:"支付业务"},
+    {name:"常驻 POI",             calls:"820 万/日", teams:5,  trend:"-3%",  scenes:"到店营销 · 附近推荐",         topConsumer:"生服 LBS"},
+    {name:"完整订单行为序列 V3",  calls:"1200 万/日",teams:6,  trend:"+7%",  scenes:"序列模型训练 · 特征回溯",     topConsumer:"算法平台"},
+    {name:"生服品类偏好 V2",      calls:"960 万/日", teams:8,  trend:"+11%", scenes:"到店/到家推荐",                topConsumer:"生服增长"},
+    {name:"RFM 分群",             calls:"540 万/日", teams:13, trend:"+2%",  scenes:"CRM · 精准营销 · 触达",       topConsumer:"用户增长"},
+    {name:"跨端设备聚合 global_did", calls:"1.6 亿/日",teams:20, trend:"+5%", scenes:"跨端行为分析 · 反作弊",       topConsumer:"风控团队"},
+    {name:"AI 深层消费心理 Summary", calls:"310 万/日",teams:4,  trend:"新上", scenes:"AIGC 推荐 · 智能客服",       topConsumer:"AI 中台"},
+    {name:"高价值用户召回名单",   calls:"780 万/日", teams:7,  trend:"+22%", scenes:"营销回捞 · Push",              topConsumer:"电商增长团队"},
+    {name:"竞品行为标签",         calls:"210 万/日", teams:3,  trend:"-8%",  scenes:"竞品分析 · 战略洞察",         topConsumer:"战略分析"}
   ]
 };
+
+/* AB 实验收益汇总（消费方使用画像标签跑的实验） */
+let OWNER_AB_EXPERIMENTS = [
+  {expId:"AB-2026-0712", name:"高价值用户 Push 召回",     tag:"活跃天数分层",          consumer:"电商增长 · 王磊",     scene:"营销触达 · 召回", metric:"CTR",    lift:"+18.2%", pv:"1.2 亿", pval:"<0.01",  incGmv:"+2380 万", incUser:"+42.6 万", status:"已结论", conclusion:"显著正向"},
+  {expId:"AB-2026-0708", name:"直播猜你喜欢排序优化",     tag:"标准四级类目购买人群",  consumer:"直播电商 · 陈昊",     scene:"推荐排序",         metric:"人均观看时长", lift:"+9.1%",  pv:"8600 万", pval:"<0.01",  incGmv:"+1520 万", incUser:"+18.4 万", status:"已结论", conclusion:"显著正向"},
+  {expId:"AB-2026-0705", name:"高消费人群优惠券投放",     tag:"支付交易金额",          consumer:"支付业务 · 林伟",     scene:"权益运营",         metric:"核销率", lift:"+6.4%",  pv:"3200 万", pval:"<0.05",  incGmv:"+840 万",  incUser:"+7.2 万",  status:"已结论", conclusion:"显著正向"},
+  {expId:"AB-2026-0701", name:"到店营销 POI 精准触达",    tag:"常驻 POI",              consumer:"生服 LBS · 赵雅",     scene:"到店营销",         metric:"到店率", lift:"+3.8%",  pv:"620 万",  pval:"0.08",   incGmv:"+210 万",  incUser:"+2.1 万",  status:"待评审", conclusion:"边界显著"},
+  {expId:"AB-2026-0628", name:"序列模型 V3 冷启动优化",   tag:"完整订单行为序列 V3",   consumer:"算法平台 · 陆宁",     scene:"模型训练 · 冷启",  metric:"新客次留", lift:"+11.5%", pv:"940 万",  pval:"<0.01",  incGmv:"+680 万",  incUser:"+9.5 万",  status:"已结论", conclusion:"显著正向"},
+  {expId:"AB-2026-0624", name:"跨端设备聚合反作弊",       tag:"跨端设备聚合 global_did", consumer:"风控团队 · 姚敏",   scene:"反作弊 · 风控",    metric:"作弊拦截率", lift:"+22.7%", pv:"4.1 亿",  pval:"<0.01",  incGmv:"节流 +1150 万", incUser:"—",         status:"已结论", conclusion:"显著正向"},
+  {expId:"AB-2026-0620", name:"RFM 分群精准 EDM",          tag:"RFM 分群",              consumer:"用户增长 · 苏雅",     scene:"CRM · 邮件",       metric:"转化率", lift:"-1.2%",  pv:"280 万",  pval:"0.31",   incGmv:"—",         incUser:"—",         status:"已结论", conclusion:"未显著 · 回滚"},
+  {expId:"AB-2026-0615", name:"AIGC 客服话术推荐",         tag:"AI 深层消费心理 Summary", consumer:"AI 中台 · 张洁",   scene:"智能客服",         metric:"一次解决率", lift:"+7.3%",  pv:"180 万",  pval:"<0.05",  incGmv:"节流 +320 万",  incUser:"—",         status:"进行中", conclusion:"初步正向"}
+];
 
 function nextAppId(){return "APP-2026-"+String(1100+APPLICATIONS.length).padStart(4,"0");}
 function nowTs(){return new Date().toLocaleString("zh-CN",{hour12:false}).replace(/\//g,"-");}
 function levelClass(l){return l.startsWith("L2")?"l2":l.startsWith("L3")?"l3":"l4";}
+function formatCallsNum(num, fallback){
+  if(!num || num<=0) return fallback || "—";
+  if(num>=1e8) return (num/1e8).toFixed(1).replace(/\.0$/,"") + " 亿/日";
+  if(num>=1e4) return Math.round(num/1e4) + " 万/日";
+  return num + "/日";
+}
 function statusBadge(s){
   const map={"草稿":"l2","待审批":"l3","审批中":"l3","已通过":"l1","已拒绝":"l4","已撤回":"l2","即将到期":"l3","已到期":"l4","已回收":"l4"};
   return `<span class="level ${map[s]||"l3"}">${s}</span>`;
@@ -2374,16 +2431,20 @@ function ownerTabAssets(body){
       actions += `<button class="btn-ghost btn" style="padding:3px 8px;font-size:11px;margin-left:4px"
         onclick="setOwnerTab('acl')">回收权限</button>`;
     }
-    return `<tr>
+    return `<tr class="clickable-row" onclick="openTagConsumersModal('${t.tagId}')" title="点击查看该标签的使用方明细">
       <td><b>${t.tagName}</b><br/><code style="color:var(--p);font-size:10px">${t.tagId}</code></td>
       <td>${t.domain}</td>
       <td>${t.level.includes("?")?`<span class="level l3">${t.level}</span>`:`<span class="level ${levelClass(t.level)}">${t.level}</span>`}</td>
       <td><span class="pill" style="font-size:10px">${t.origLevel}</span></td>
       <td style="font-size:11px">${t.ownerTeam}</td>
-      <td><a href="javascript:void(0)" onclick="openTagMetaModal('${t.tagId}')" style="color:${metaColor};font-weight:600;text-decoration:none">${t.metaComplete}%</a></td>
+      <td>
+        <div style="font-weight:600;color:${t.callsNum>0?"var(--p)":"var(--mute)"}">${formatCallsNum(t.callsNum, t.calls)}</div>
+        <div style="color:var(--mute);font-size:10px;margin-top:2px">${t.consumers>0?`${t.consumers} 个使用方`:"暂无使用方"}</div>
+      </td>
+      <td><a href="javascript:void(0)" onclick="event.stopPropagation();openTagMetaModal('${t.tagId}')" style="color:${metaColor};font-weight:600;text-decoration:none">${t.metaComplete}%</a></td>
       <td><span class="pill" style="color:${entryColor}">${t.approvalEntry}</span></td>
       <td><span class="level ${lcColor}">${lc}</span></td>
-      <td>${actions}</td>
+      <td onclick="event.stopPropagation()">${actions}</td>
     </tr>`;
   }).join("");
 
@@ -2401,12 +2462,207 @@ function ownerTabAssets(body){
       <table>
         <thead><tr>
           <th>标签</th><th>来源域</th><th>统一分级</th><th>原始分级</th>
-          <th>Owner Team</th><th>元信息完整度</th><th>审批入口</th><th>上架状态</th><th>操作</th>
+          <th>Owner Team</th><th>调用量</th><th>元信息完整度</th><th>审批入口</th><th>上架状态</th><th>操作</th>
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="alert info" style="margin-top:10px">
         🔒 合规校验点：<b>unified_level 缺失只能进"待分级"池</b>；<b>受控/高敏必须具备审批入口才开放申请</b>；<b>Owner 不在职时进"待认领"，不新增高敏授权</b>；<b>分级降级必须经安全/法务确认</b>。
+      </div>
+      <div class="alert info" style="margin-top:8px;background:var(--p-light);border-color:rgba(51,112,255,.25);color:var(--p)">
+        💡 <b>提示</b>：点击表格中的任一行，可查看该标签的所有使用方明细（含场景、时间、状态等），支持搜索与分页。
+      </div>
+    </div>
+  `;
+}
+
+/* ---------- 使用方明细弹窗（点击标签资产行触发） ---------- */
+let _consumersModalState = { tagId:null, keyword:"", statusFilter:"", page:1, pageSize:5 };
+
+function _subjectTypeIcon(type){
+  return type==="user"?"👤":type==="team"?"👥":type==="app"?"🧩":type==="service"?"⚙️":"🔗";
+}
+function _statusPillClass(status){
+  return status==="生效中"?"l1":status==="即将到期"?"l3":status==="已冻结"?"l4":status==="已过期"?"l4":"l2";
+}
+
+function _getConsumersOfTag(tagId){
+  return OWNER_AUTHORIZATIONS.filter(a=>a.tagId===tagId);
+}
+function _filterConsumers(list){
+  const kw = (_consumersModalState.keyword||"").trim().toLowerCase();
+  const sf = _consumersModalState.statusFilter;
+  return list.filter(a=>{
+    if(sf && a.status!==sf) return false;
+    if(!kw) return true;
+    return (a.subject||"").toLowerCase().includes(kw)
+        || (a.scene||"").toLowerCase().includes(kw)
+        || (a.authId||"").toLowerCase().includes(kw)
+        || (a.ops||"").toLowerCase().includes(kw);
+  });
+}
+
+window.openTagConsumersModal = function(tagId){
+  const tag = MY_TAGS_AS_OWNER.find(t=>t.tagId===tagId);
+  if(!tag){alert("未找到该标签");return;}
+  _consumersModalState = { tagId, keyword:"", statusFilter:"", page:1, pageSize:5 };
+  document.getElementById("tagConsumersModal").classList.add("active");
+  renderTagConsumersModal();
+  pushAudit("查看使用方明细", `${tag.tagName} · ${tagId}`, tag.level, "low");
+};
+
+window.closeTagConsumersModal = function(){
+  document.getElementById("tagConsumersModal").classList.remove("active");
+};
+
+window.setConsumerModalKeyword = function(v){
+  _consumersModalState.keyword = v;
+  _consumersModalState.page = 1;
+  renderTagConsumersModal();
+};
+window.setConsumerModalStatus = function(v){
+  _consumersModalState.statusFilter = v;
+  _consumersModalState.page = 1;
+  renderTagConsumersModal();
+};
+window.setConsumerModalPage = function(p){
+  _consumersModalState.page = p;
+  renderTagConsumersModal();
+};
+window.setConsumerModalPageSize = function(sz){
+  _consumersModalState.pageSize = Number(sz)||5;
+  _consumersModalState.page = 1;
+  renderTagConsumersModal();
+};
+
+function renderTagConsumersModal(){
+  const {tagId, keyword, statusFilter, page, pageSize} = _consumersModalState;
+  const tag = MY_TAGS_AS_OWNER.find(t=>t.tagId===tagId);
+  if(!tag) return;
+  const all = _getConsumersOfTag(tagId);
+  const filtered = _filterConsumers(all);
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total/pageSize));
+  const curPage = Math.min(page, totalPages);
+  const start = (curPage-1)*pageSize;
+  const rows = filtered.slice(start, start+pageSize);
+
+  const statusCounts = all.reduce((m,a)=>{m[a.status]=(m[a.status]||0)+1;return m;},{});
+  const statusOptions = ["","生效中","即将到期","已冻结","已过期"];
+
+  const rowsHtml = rows.length ? rows.map(a=>{
+    const daysHint = a.expireDays===undefined ? "" :
+      a.expireDays<0 ? `已过期 ${Math.abs(a.expireDays)} 天` :
+      a.expireDays<=30 ? `${a.expireDays} 天后到期` : `${a.expireDays} 天`;
+    const daysColor = a.expireDays===undefined ? "var(--mute)" :
+      a.expireDays<0 ? "var(--err)" :
+      a.expireDays<=7 ? "var(--err)" :
+      a.expireDays<=30 ? "var(--warn)" : "var(--mute)";
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px">${_subjectTypeIcon(a.subjectType)}</span>
+          <b>${a.subject}</b>
+        </div>
+        <div style="font-family:'SF Mono',Menlo,monospace;color:var(--mute);font-size:10px;margin-top:2px">${a.authId}</div>
+      </td>
+      <td>${a.scene}<div style="color:var(--mute);font-size:10px;margin-top:2px">操作：${a.ops}</div></td>
+      <td><span class="level ${_statusPillClass(a.status)}">${a.status}</span>${a.frozen?`<div style="color:var(--err);font-size:10px;margin-top:2px">${a.frozen}</div>`:""}</td>
+      <td style="font-size:11px">
+        <div>${a.effective}</div>
+        <div style="color:var(--mute)">→ ${a.expire}</div>
+        <div style="color:${daysColor};font-size:10px;margin-top:2px">${daysHint}</div>
+      </td>
+      <td>
+        <div style="font-size:11px">${a.callVol||"—"}</div>
+        <div style="color:var(--mute);font-size:10px">最近调用：${a.lastCall||"—"}</div>
+        <div style="color:var(--mute);font-size:10px">配额：${a.quota||"—"}</div>
+      </td>
+      <td>
+        <button class="btn-ghost btn" style="padding:3px 8px;font-size:11px" onclick="closeTagConsumersModal();setOwnerTab('acl')">回收</button>
+      </td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--mute);padding:32px">
+      ${all.length===0?"暂无使用方 · 该标签尚未产生任何授权":"没有匹配的使用方，请调整搜索条件"}</td></tr>`;
+
+  // 分页控件
+  const pageBtns = [];
+  const maxBtns = 5;
+  let s = Math.max(1, curPage-Math.floor(maxBtns/2));
+  let e = Math.min(totalPages, s+maxBtns-1);
+  s = Math.max(1, e-maxBtns+1);
+  if(s>1) pageBtns.push(`<button class="pg-btn" onclick="setConsumerModalPage(1)">1</button>${s>2?`<span class="pg-ell">…</span>`:""}`);
+  for(let i=s;i<=e;i++){
+    pageBtns.push(`<button class="pg-btn ${i===curPage?"active":""}" onclick="setConsumerModalPage(${i})">${i}</button>`);
+  }
+  if(e<totalPages) pageBtns.push(`${e<totalPages-1?`<span class="pg-ell">…</span>`:""}<button class="pg-btn" onclick="setConsumerModalPage(${totalPages})">${totalPages}</button>`);
+
+  const statusFilterHtml = statusOptions.map(s=>{
+    const label = s || `全部（${all.length}）`;
+    const cnt = s ? (statusCounts[s]||0) : all.length;
+    const active = statusFilter===s;
+    return `<button class="chip ${active?"chip-active":""}" onclick="setConsumerModalStatus('${s}')">${s||"全部"} <b>${cnt}</b></button>`;
+  }).join("");
+
+  document.getElementById("tagConsumersInner").innerHTML = `
+    <div class="modal-head">
+      <div class="modal-title">
+        <div class="modal-title-name">
+          <span>👥 使用方明细</span>
+          <span class="level ${tag.level.includes("?")?"l3":levelClass(tag.level)}">${tag.level}</span>
+        </div>
+        <div class="modal-title-id">${tag.tagName} · <code style="color:var(--p)">${tag.tagId}</code> · ${tag.domain}</div>
+        <div class="modal-title-meta">
+          <span class="pill">Owner Team：${tag.ownerTeam}</span>
+          <span class="pill">授权总数：<b>${all.length}</b></span>
+          <span class="pill">调用规模：${tag.calls}</span>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeTagConsumersModal()" title="关闭">✕</button>
+    </div>
+
+    <div style="padding:14px 22px;background:#fff;border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <div style="flex:1;min-width:220px;display:flex;align-items:center;gap:6px;background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:6px 10px">
+        <span style="color:var(--mute)">🔍</span>
+        <input id="consumersKw" placeholder="搜索使用方 / 场景 / 授权 ID / 操作类型…" value="${keyword.replace(/"/g,'&quot;')}"
+          oninput="setConsumerModalKeyword(this.value)"
+          style="flex:1;border:none;outline:none;background:transparent;font-size:12px;color:var(--text)"/>
+        ${keyword?`<span style="cursor:pointer;color:var(--mute)" onclick="setConsumerModalKeyword('')">✕</span>`:""}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${statusFilterHtml}</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mute)">
+        每页
+        <select onchange="setConsumerModalPageSize(this.value)" style="border:1px solid var(--line);border-radius:6px;padding:3px 6px;font-size:11px">
+          ${[5,10,20].map(n=>`<option value="${n}" ${n===pageSize?"selected":""}>${n}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+
+    <div style="overflow-y:auto;background:var(--bg2);padding:0;flex:1">
+      <div class="consumers-table-wrap" style="background:#fff;margin:14px 22px;border:1px solid var(--line);border-radius:8px;overflow:hidden">
+        <table style="font-size:12px">
+          <thead><tr>
+            <th style="min-width:160px">使用方 / 授权 ID</th>
+            <th style="min-width:180px">使用场景 / 操作</th>
+            <th style="min-width:90px">授权状态</th>
+            <th style="min-width:130px">生效期</th>
+            <th style="min-width:140px">调用量 / 配额</th>
+            <th style="width:70px">操作</th>
+          </tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <div style="font-size:12px;color:var(--mute)">
+        共 <b style="color:var(--text)">${total}</b> 条${keyword||statusFilter?` · 已筛选自 ${all.length} 条`:""}
+        ${total>0?` · 第 ${start+1}-${Math.min(start+pageSize, total)} 条`:""}
+      </div>
+      <div style="display:flex;align-items:center;gap:6px" class="pg-wrap">
+        <button class="pg-btn" onclick="setConsumerModalPage(${Math.max(1,curPage-1)})" ${curPage<=1?"disabled":""}>‹ 上一页</button>
+        ${pageBtns.join("")}
+        <button class="pg-btn" onclick="setConsumerModalPage(${Math.min(totalPages,curPage+1)})" ${curPage>=totalPages?"disabled":""}>下一页 ›</button>
       </div>
     </div>
   `;
@@ -2987,6 +3243,102 @@ function ownerTabAudit(body){
 }
 
 /* ---------- 2.9 使用回写 · 资产影响力 ---------- */
+function _renderInfluenceRows(expanded){
+  const list = expanded ? OWNER_USAGE_SUMMARY.topTags : OWNER_USAGE_SUMMARY.topTags.slice(0,5);
+  return list.map((t,i)=>{
+    const rankColor = i===0?"#F53F3F":i===1?"#FF7D00":i===2?"#FFB700":"var(--mute)";
+    const trendColor = t.trend.startsWith("+")?"var(--ok)":t.trend.startsWith("-")?"var(--err)":"var(--mute)";
+    return `<tr>
+      <td><span style="color:${rankColor};font-weight:700;margin-right:4px">${i+1}</span><b>${t.name}</b></td>
+      <td>${t.calls}</td>
+      <td>${t.teams}</td>
+      <td style="font-size:11px">${t.topConsumer||"—"}</td>
+      <td style="font-size:11px;color:var(--mute)">${t.scenes||"—"}</td>
+      <td><span style="color:${trendColor}">${t.trend}</span></td>
+    </tr>`;
+  }).join("");
+}
+window.toggleInfluenceExpand = function(btn){
+  const expanded = btn.dataset.expanded === "true";
+  const next = !expanded;
+  btn.dataset.expanded = String(next);
+  const total = OWNER_USAGE_SUMMARY.topTags.length;
+  btn.innerHTML = next ? `收起（仅看 Top 5） ▴` : `展开全部 ${total} 条 ▾`;
+  document.getElementById("influenceTbody").innerHTML = _renderInfluenceRows(next);
+};
+
+/* AB 实验收益汇总 · Section */
+function _abKpiSummary(){
+  const list = OWNER_AB_EXPERIMENTS;
+  const total = list.length;
+  const positive = list.filter(x=>x.conclusion.includes("显著正向")).length;
+  const running  = list.filter(x=>x.status==="进行中").length;
+  const rollback = list.filter(x=>x.conclusion.includes("回滚")).length;
+  // 简单汇总增量 GMV（把中文 "亿/万" 抽出）
+  let gmvWan = 0;
+  list.forEach(x=>{
+    const m = (x.incGmv||"").match(/([\d.]+)\s*(亿|万)/);
+    if(m){ gmvWan += parseFloat(m[1]) * (m[2]==="亿"?10000:1); }
+  });
+  const gmvStr = gmvWan>=10000 ? (gmvWan/10000).toFixed(2)+" 亿" : Math.round(gmvWan)+" 万";
+  return {total, positive, running, rollback, gmvStr, winRate: Math.round(positive/total*100)};
+}
+function _renderAbRows(expanded){
+  const list = expanded ? OWNER_AB_EXPERIMENTS : OWNER_AB_EXPERIMENTS.slice(0,5);
+  return list.map(x=>{
+    const liftColor = x.lift.startsWith("+")?"var(--ok)":x.lift.startsWith("-")?"var(--err)":"var(--mute)";
+    const statusPill = x.status==="已结论"?"l1":x.status==="进行中"?"l3":"l2";
+    const conColor = x.conclusion.includes("显著正向")?"var(--ok)":x.conclusion.includes("回滚")?"var(--err)":x.conclusion.includes("初步")?"var(--p)":"var(--mute)";
+    return `<tr>
+      <td><b>${x.name}</b><br/><code style="color:var(--p);font-size:10px">${x.expId}</code></td>
+      <td style="font-size:11px"><span class="chip">${x.tag}</span></td>
+      <td style="font-size:11px">${x.consumer}<br/><span style="color:var(--mute);font-size:10px">${x.scene}</span></td>
+      <td style="font-size:11px">${x.metric}</td>
+      <td style="font-weight:600;color:${liftColor}">${x.lift}<br/><span style="color:var(--mute);font-weight:400;font-size:10px">p ${x.pval} · PV ${x.pv}</span></td>
+      <td style="font-size:11px">GMV <b style="color:var(--ok)">${x.incGmv}</b><br/><span style="color:var(--mute);font-size:10px">用户 ${x.incUser}</span></td>
+      <td><span class="level ${statusPill}">${x.status}</span><br/><span style="color:${conColor};font-size:10px;font-weight:600">${x.conclusion}</span></td>
+    </tr>`;
+  }).join("");
+}
+window.toggleAbExpand = function(btn){
+  const expanded = btn.dataset.expanded === "true";
+  const next = !expanded;
+  btn.dataset.expanded = String(next);
+  const total = OWNER_AB_EXPERIMENTS.length;
+  btn.innerHTML = next ? `收起（仅看最近 5 个） ▴` : `展开全部 ${total} 个实验 ▾`;
+  document.getElementById("abExpTbody").innerHTML = _renderAbRows(next);
+};
+function _renderAbExperimentSection(){
+  const sum = _abKpiSummary();
+  return `
+    <div class="card" style="margin-top:12px">
+      <h3>AB 实验收益汇总 <span class="badge">消费方基于本 Owner 标签的实验产出</span>
+        <span class="pill" style="float:right;font-weight:400">共 ${sum.total} 个实验</span>
+      </h3>
+      <div class="kpi-row" style="grid-template-columns:repeat(5,1fr);margin:6px 0 12px">
+        <div class="kpi"><div class="kpi-label">总实验数</div><div class="kpi-value">${sum.total}</div><div class="kpi-trend up">近 60 日 +3</div></div>
+        <div class="kpi"><div class="kpi-label">显著正向</div><div class="kpi-value" style="color:var(--ok)">${sum.positive}</div><div class="kpi-trend up">胜率 ${sum.winRate}%</div></div>
+        <div class="kpi"><div class="kpi-label">进行中</div><div class="kpi-value" style="color:var(--p)">${sum.running}</div><div class="kpi-trend">观察中</div></div>
+        <div class="kpi"><div class="kpi-label">未显著/回滚</div><div class="kpi-value" style="color:var(--err)">${sum.rollback}</div><div class="kpi-trend down">已复盘</div></div>
+        <div class="kpi"><div class="kpi-label">累计增量 GMV</div><div class="kpi-value" style="color:var(--ok)">${sum.gmvStr}</div><div class="kpi-trend up">按各实验结论口径</div></div>
+      </div>
+      <div style="overflow-x:auto">
+      <table style="min-width:900px">
+        <thead><tr>
+          <th>实验 / 编号</th><th>使用标签</th><th>使用方 · 场景</th><th>核心指标</th><th>指标提升</th><th>业务收益</th><th>状态 · 结论</th>
+        </tr></thead>
+        <tbody id="abExpTbody">${_renderAbRows(false)}</tbody>
+      </table>
+      </div>
+      <div style="text-align:center;margin-top:10px">
+        ${OWNER_AB_EXPERIMENTS.length>5 ? `<button class="btn btn-ghost" style="font-size:12px;padding:6px 20px" onclick="toggleAbExpand(this)" data-expanded="false">展开全部 ${OWNER_AB_EXPERIMENTS.length} 个实验 ▾</button>` : ""}
+      </div>
+      <div class="alert info" style="margin-top:10px;font-size:11px">
+        💡 <b>说明</b>：AB 实验数据来自消费方接入的实验平台回写，Owner 可据此评估标签的业务价值、驱动"高价值召回场景包"沉淀，并结合胜率/回滚率优化标签口径。
+      </div>
+    </div>`;
+}
+
 function ownerTabUsage(body){
   const s = OWNER_USAGE_SUMMARY;
   const passRate = Math.round(s.approvalStats.approved / s.approvalStats.applied * 100);
@@ -3007,14 +3359,16 @@ function ownerTabUsage(body){
 
     <div class="grid" style="grid-template-columns:1.2fr 1fr;margin-top:12px">
       <div class="card">
-        <h3>标签影响力 Top 5 <span class="badge">按调用量 & 覆盖团队</span></h3>
+        <h3>标签影响力 <span class="badge">按调用量 & 覆盖团队</span>
+          <span class="pill" style="float:right;font-weight:400">共 ${s.topTags.length} 条</span>
+        </h3>
         <table>
-          <thead><tr><th>标签</th><th>调用量</th><th>覆盖团队</th><th>趋势</th></tr></thead>
-          <tbody>${s.topTags.map(t=>`<tr>
-            <td><b>${t.name}</b></td><td>${t.calls}</td><td>${t.teams}</td>
-            <td><span style="color:${t.trend.startsWith("+")?"var(--ok)":t.trend.startsWith("-")?"var(--err)":"var(--mute)"}">${t.trend}</span></td>
-          </tr>`).join("")}</tbody>
+          <thead><tr><th>标签</th><th>调用量</th><th>覆盖团队</th><th>核心使用方</th><th>主要场景</th><th>趋势</th></tr></thead>
+          <tbody id="influenceTbody">${_renderInfluenceRows(false)}</tbody>
         </table>
+        <div style="text-align:center;margin-top:10px" id="influenceToggleWrap">
+          ${s.topTags.length>5 ? `<button class="btn btn-ghost" style="font-size:12px;padding:6px 20px" onclick="toggleInfluenceExpand(this)" data-expanded="false">展开全部 ${s.topTags.length} 条 ▾</button>` : ""}
+        </div>
       </div>
       <div class="card">
         <h3>反向优化建议 <span class="badge">口径优化</span></h3>
@@ -3026,6 +3380,8 @@ function ownerTabUsage(body){
         </div>
       </div>
     </div>
+
+    ${_renderAbExperimentSection()}
   `;
 
   echarts.init(document.getElementById("ownUsageTrend")).setOption({
